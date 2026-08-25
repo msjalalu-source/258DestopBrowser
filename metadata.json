@@ -1,0 +1,7 @@
+{
+  "name": "WinView Browser",
+  "description": "A web browser featuring Windows Desktop & Mobile view spoofing, Windows fidelity score auditor, ad blocker, and popup blocker.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
