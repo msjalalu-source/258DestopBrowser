@@ -225,13 +225,23 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     val cleanInput = input.trim()
     if (cleanInput.isEmpty()) return
 
+    // 1. Instant Pre-Search Query Guard (Blocks explicit search queries before requesting search engines)
+    if (AdultFilterEngine.isAdultQuery(cleanInput)) {
+      val blockedHtml = AdultFilterEngine.getBlockedAdultHtml(cleanInput)
+      val dataUrl = "data:text/html;charset=utf-8," + Uri.encode(blockedHtml)
+      incrementBlockedAdult(targetTabId, cleanInput)
+      updateTab(targetTabId, url = dataUrl, title = "🛡️ Blocked Adult Content", blockedAdsCount = 0, blockedPopupsCount = 0)
+      return
+    }
+
     val url = formatUrlOrSearch(cleanInput, _settings.value.searchEngine)
 
+    // 2. Direct URL and destination adult content check
     if (AdultFilterEngine.isAdultContent(url)) {
       val blockedHtml = AdultFilterEngine.getBlockedAdultHtml(url)
       val dataUrl = "data:text/html;charset=utf-8," + Uri.encode(blockedHtml)
       incrementBlockedAdult(targetTabId, url)
-      updateTab(targetTabId, url = dataUrl, title = "Blocked Adult Content", blockedAdsCount = 0, blockedPopupsCount = 0)
+      updateTab(targetTabId, url = dataUrl, title = "🛡️ Blocked Adult Content", blockedAdsCount = 0, blockedPopupsCount = 0)
       return
     }
 

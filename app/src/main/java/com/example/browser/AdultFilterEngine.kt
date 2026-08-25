@@ -9,6 +9,17 @@ object AdultFilterEngine {
   // True by default and permanently locked ON
   const val IS_PERMANENTLY_LOCKED: Boolean = true
 
+  private val ADULT_TLDS = setOf(
+    "xxx",
+    "adult",
+    "porn",
+    "sex",
+    "cam",
+    "fetish",
+    "erotica",
+    "webcam"
+  )
+
   private val ADULT_DOMAINS = setOf(
     // Major Adult Video & Tube Networks
     "pornhub.com",
@@ -50,6 +61,12 @@ object AdultFilterEngine {
     "badjojo.com",
     "tktube.com",
     "xtapes.to",
+    "youjizz.com",
+    "fuq.com",
+    "fapvid.com",
+    "fapster.xxx",
+    "leakgirls.com",
+    "leakedzone.com",
 
     // Premium Studios & Networks
     "brazzers.com",
@@ -96,6 +113,7 @@ object AdultFilterEngine {
     "streamate.com",
     "cams.com",
     "webcamromance.com",
+    "camvault.org",
 
     // Adult Creator & Subscription Platforms
     "onlyfans.com",
@@ -114,8 +132,9 @@ object AdultFilterEngine {
     "erome.com",
     "redgifs.com",
     "pornpics.com",
+    "simpcity.su",
 
-    // Asian / JAV & Regional Adult
+    // Asian / Regional / Desi Adult & Choti Sites
     "javlibrary.com",
     "javbus.com",
     "javdb.com",
@@ -133,6 +152,20 @@ object AdultFilterEngine {
     "desipapa.com",
     "antarvasna.com",
     "savita.com",
+    "banglachoti.com",
+    "banglachotikahini.com",
+    "chotikahini.com",
+    "banglachotigolpo.com",
+    "desichotikahini.com",
+    "desikahani.in",
+    "desiporn.tv",
+    "desixnxx.com",
+    "kamababa.com",
+    "bhojpurisex.com",
+    "banglasex.org",
+    "masaladesi.com",
+    "indianporn365.com",
+    "indianpornvideos.com",
 
     // Hentai / Anime NSFW
     "hentaihaven.xxx",
@@ -160,6 +193,17 @@ object AdultFilterEngine {
     "hentaicity.com",
     "hentai-foundry.com",
     "asmhentai.com",
+    "doujins.com",
+
+    // AI Adult / Deepfake / Strip
+    "undress.app",
+    "clothoff.io",
+    "deepnude.to",
+    "nudify.online",
+    "soulgen.net",
+    "pornx.ai",
+    "candy.ai",
+    "nsfwcharacter.ai",
 
     // Extreme & Aggregator Sites
     "heavy-r.com",
@@ -243,7 +287,65 @@ object AdultFilterEngine {
     "shemalez",
     "transerotic",
     "gayporno",
-    "boyfriendtv"
+    "boyfriendtv",
+    "deepnude",
+    "nudify",
+    "clothoff",
+    "undressapp"
+  )
+
+  // Bengali Explicit / Adult terms
+  private val BANGLA_EXPLICIT_KEYWORDS = listOf(
+    "চটি",
+    "চটি গল্প",
+    "চটিগল্প",
+    "সেক্স",
+    "পর্ন",
+    "পর্নো",
+    "যৌন",
+    "মাগী",
+    "চুদা",
+    "চোদন",
+    "লেসবিয়ান",
+    "গে সেক্স",
+    "পর্ণগ্রাফি",
+    "পতিতা",
+    "বেশ্যা",
+    "কামসূত্র",
+    "কামুক",
+    "যৌনমিলন",
+    "নগ্ন",
+    "উলঙ্গ",
+    "ধর্ষণ ভিডিও",
+    "যৌনাঙ্গ",
+    "সঙ্গম",
+    "স্তন উন্মুক্ত",
+    "দেহ ব্যবসা"
+  )
+
+  // Transliterated Banglish / Desi Adult terms
+  private val BANGLA_TRANSLITERATED_KEYWORDS = listOf(
+    "choti",
+    "chotigolpo",
+    "banglachoti",
+    "bangla choti",
+    "chodon",
+    "chuda",
+    "chudachudi",
+    "magi",
+    "mogi",
+    "bessha",
+    "potita",
+    "bhabi sex",
+    "desi bhabhi",
+    "aunty sex",
+    "bangla sex",
+    "desiporn",
+    "desixxx",
+    "banglaporn",
+    "kolkata porn",
+    "kamababa",
+    "antarvasna"
   )
 
   private val SENSITIVE_TOKEN_SUBSTRINGS = listOf(
@@ -266,8 +368,61 @@ object AdultFilterEngine {
     "blowjob-video",
     "cumshot-video",
     "deepthroat-video",
-    "erotic-cams"
+    "erotic-cams",
+    "sex-video",
+    "nudity-video",
+    "erotic-gallery"
   )
+
+  /**
+   * Evaluates if a raw user search query string contains explicit/adult keywords.
+   * Enables immediate blocking before even sending query to search engines.
+   */
+  fun isAdultQuery(query: String?): Boolean {
+    if (query.isNullOrBlank()) return false
+    val lower = query.trim().lowercase()
+
+    // 1. Check Bengali explicit keywords
+    for (banglaWord in BANGLA_EXPLICIT_KEYWORDS) {
+      if (lower.contains(banglaWord)) return true
+    }
+
+    // 2. Check Banglish / Transliterated explicit keywords
+    for (token in BANGLA_TRANSLITERATED_KEYWORDS) {
+      if (containsWordOrSubstr(lower, token)) return true
+    }
+
+    // 3. Check general adult keywords
+    for (kw in ADULT_KEYWORDS) {
+      if (containsWordOrSubstr(lower, kw)) return true
+    }
+
+    // 4. Token list check
+    for (token in SENSITIVE_TOKEN_SUBSTRINGS) {
+      if (lower.contains(token)) return true
+    }
+
+    // 5. Standalone explicit word check in tokens
+    val words = lower.split(Regex("[\\s,._\\-+]+"))
+    val forbiddenWords = setOf(
+      "porn", "xxx", "sex", "hentai", "nude", "nudes", "nudity", "nsfw", "erotic",
+      "blowjob", "creampie", "milf", "dildo", "boobs", "pussy", "vagina", "cumshot",
+      "masturbation", "incest", "gangbang", "escort", "stripper", "deepfake", "undress"
+    )
+
+    if (words.any { forbiddenWords.contains(it) }) {
+      return true
+    }
+
+    return false
+  }
+
+  private fun containsWordOrSubstr(text: String, keyword: String): Boolean {
+    if (keyword.contains(" ")) {
+      return text.contains(keyword)
+    }
+    return text.contains(keyword)
+  }
 
   /**
    * Checks if a URL points to adult content.
@@ -280,6 +435,15 @@ object AdultFilterEngine {
       val uri = Uri.parse(urlString)
       val host = uri.host?.lowercase() ?: return false
       val fullUrl = urlString.lowercase()
+
+      // 0. TLD Check (.xxx, .adult, .porn, .sex, .cam)
+      val hostSegments = host.split(".")
+      if (hostSegments.isNotEmpty()) {
+        val tld = hostSegments.last()
+        if (ADULT_TLDS.contains(tld)) {
+          return true
+        }
+      }
 
       // 1. Direct Domain matching & Subdomain checks
       for (domain in ADULT_DOMAINS) {
@@ -295,7 +459,14 @@ object AdultFilterEngine {
         }
       }
 
-      // 3. Path & Query sensitive token search
+      // 3. Banglish/Desi host keywords
+      for (banglish in BANGLA_TRANSLITERATED_KEYWORDS) {
+        if (host.contains(banglish.replace(" ", ""))) {
+          return true
+        }
+      }
+
+      // 4. Path & Query sensitive token search
       val pathAndQuery = ((uri.path ?: "") + " " + (uri.query ?: "")).lowercase()
       for (token in SENSITIVE_TOKEN_SUBSTRINGS) {
         if (pathAndQuery.contains(token)) {
@@ -303,9 +474,15 @@ object AdultFilterEngine {
         }
       }
 
-      // 4. Standalone 'xxx' or 'porn' in host domain parts
-      val hostParts = host.split(".")
-      if (hostParts.any { it == "xxx" || it == "porn" || it == "adult" || it == "sex" || it == "hentai" || it == "nsfw" }) {
+      // 5. Bengali keyword search in query / path
+      for (banglaWord in BANGLA_EXPLICIT_KEYWORDS) {
+        if (pathAndQuery.contains(banglaWord)) {
+          return true
+        }
+      }
+
+      // 6. Standalone 'xxx', 'porn', 'hentai', 'sex' in host domain parts
+      if (hostSegments.any { it == "xxx" || it == "porn" || it == "adult" || it == "sex" || it == "hentai" || it == "nsfw" }) {
         return true
       }
 
@@ -316,7 +493,7 @@ object AdultFilterEngine {
   }
 
   /**
-   * Enforces SafeSearch parameter on search engine queries.
+   * Enforces SafeSearch parameters strictly on all major search engine queries.
    */
   fun enforceSafeSearch(url: String): String {
     if (url.startsWith("about:") || url.startsWith("data:")) return url
@@ -326,16 +503,19 @@ object AdultFilterEngine {
       val host = uri.host?.lowercase() ?: return url
 
       when {
-        // Google Search SafeSearch
+        // Google Search SafeSearch Strict (safe=active&ssui=on)
         host.contains("google.") && uri.path?.contains("/search") == true -> {
-          if (!url.contains("safe=active") && !url.contains("safe=strict")) {
-            if (url.contains("?")) "$url&safe=active" else "$url?safe=active"
-          } else {
-            url
+          var updated = url
+          if (!updated.contains("safe=active") && !updated.contains("safe=strict")) {
+            updated = if (updated.contains("?")) "$updated&safe=active" else "$updated?safe=active"
           }
+          if (!updated.contains("ssui=on")) {
+            updated = "$updated&ssui=on"
+          }
+          updated
         }
 
-        // DuckDuckGo Strict SafeSearch
+        // DuckDuckGo Strict SafeSearch (kp=1)
         host.contains("duckduckgo.com") -> {
           if (!url.contains("kp=1")) {
             if (url.contains("?")) "$url&kp=1" else "$url?kp=1"
@@ -344,7 +524,7 @@ object AdultFilterEngine {
           }
         }
 
-        // Bing Strict SafeSearch
+        // Bing Strict SafeSearch (adlt=strict)
         host.contains("bing.com") && uri.path?.contains("/search") == true -> {
           if (!url.contains("adlt=strict")) {
             if (url.contains("?")) "$url&adlt=strict" else "$url?adlt=strict"
@@ -353,10 +533,46 @@ object AdultFilterEngine {
           }
         }
 
-        // YouTube Restricted Mode
-        host.contains("youtube.com") -> {
-          if (!url.contains("has_verified=1")) {
+        // Yahoo Strict SafeSearch (vm=r)
+        host.contains("search.yahoo.com") -> {
+          if (!url.contains("vm=r")) {
+            if (url.contains("?")) "$url&vm=r" else "$url?vm=r"
+          } else {
             url
+          }
+        }
+
+        // Brave Search Strict (safesearch=strict)
+        host.contains("search.brave.com") -> {
+          if (!url.contains("safesearch=strict")) {
+            if (url.contains("?")) "$url&safesearch=strict" else "$url?safesearch=strict"
+          } else {
+            url
+          }
+        }
+
+        // Ecosia Strict (safesearch=2)
+        host.contains("ecosia.org") -> {
+          if (!url.contains("safesearch=2")) {
+            if (url.contains("?")) "$url&safesearch=2" else "$url?safesearch=2"
+          } else {
+            url
+          }
+        }
+
+        // Yandex Family Search (family=yes)
+        host.contains("yandex.") -> {
+          if (!url.contains("family=yes")) {
+            if (url.contains("?")) "$url&family=yes" else "$url?family=yes"
+          } else {
+            url
+          }
+        }
+
+        // YouTube Strict Safety Mode
+        host.contains("youtube.com") -> {
+          if (!url.contains("safe_search=1")) {
+            if (url.contains("?")) "$url&safe_search=1" else "$url?safe_search=1"
           } else {
             url
           }
@@ -367,6 +583,64 @@ object AdultFilterEngine {
     } catch (e: Exception) {
       url
     }
+  }
+
+  /**
+   * In-Page live JavaScript sanitizer that removes adult banner ads, malicious popunders,
+   * cam iframes, and explicit links in real-time.
+   */
+  fun getAdultDomSanitizerJs(): String {
+    return """
+      (function() {
+        try {
+          function purgeAdultElements() {
+            var adultPatterns = [
+              'porn', 'xxx', 'chaturbate', 'camgirl', 'stripchat', 'erome', 'brazzers',
+              'nude', 'onlyfans', 'xvideos', 'xnxx', 'hentai', 'choti'
+            ];
+            
+            // Remove malicious or adult iframes
+            var iframes = document.querySelectorAll('iframe');
+            iframes.forEach(function(f) {
+              var src = (f.src || '').toLowerCase();
+              for (var i = 0; i < adultPatterns.length; i++) {
+                if (src.indexOf(adultPatterns[i]) !== -1) {
+                  f.remove();
+                  break;
+                }
+              }
+            });
+
+            // Remove adult banner links & floating popunders
+            var links = document.querySelectorAll('a[href]');
+            links.forEach(function(a) {
+              var href = (a.href || '').toLowerCase();
+              for (var i = 0; i < adultPatterns.length; i++) {
+                if (href.indexOf(adultPatterns[i]) !== -1 && (href.indexOf('.com') !== -1 || href.indexOf('.tv') !== -1 || href.indexOf('.xxx') !== -1)) {
+                  a.style.display = 'none';
+                  a.removeAttribute('href');
+                  break;
+                }
+              }
+            });
+          }
+
+          // Initial run
+          purgeAdultElements();
+
+          // Continuous observation for dynamic SPA content
+          if (window.MutationObserver) {
+            var observer = new MutationObserver(function() {
+              purgeAdultElements();
+            });
+            observer.observe(document.body || document.documentElement, {
+              childList: true,
+              subtree: true
+            });
+          }
+        } catch(e) {}
+      })();
+    """.trimIndent()
   }
 
   /**
@@ -505,9 +779,9 @@ object AdultFilterEngine {
           <div class="shield-icon">🛡️</div>
           <div class="badge">🔒 STRICT SAFETY SHIELD ACTIVE</div>
           <h1>অ্যাডাল্ট কন্টেন্ট ব্লক করা হয়েছে</h1>
-          <p class="bengali">নিরাপদ এবং সুস্থ পারিবারিক ইন্টারনেট পরিবেশ নিশ্চিত করতে এই সাইটটি স্থায়ীভাবে ফিল্টার করা হয়েছে।</p>
+          <p class="bengali">নিরাপদ এবং সুস্থ পারিবারিক ইন্টারনেট পরিবেশ নিশ্চিত করতে এই সাইট বা অনুসন্ধানটি স্থায়ীভাবে ফিল্টার করা হয়েছে।</p>
           <div class="blocked-url-box">Blocked: $cleanUrl</div>
-          <p class="desc">This website has been identified as adult/explicit material. The Adult Content Filter is permanently locked ON and cannot be disabled.</p>
+          <p class="desc">This content or website has been identified as adult/explicit material. The Adult Content Filter is permanently locked ON and cannot be disabled.</p>
           
           <div class="btn-container">
             <button class="btn-primary" onclick="window.history.length > 1 ? window.history.back() : location.href='about:home'">Go Back to Safety / ফিরে যান</button>
@@ -534,3 +808,4 @@ object AdultFilterEngine {
     )
   }
 }
+

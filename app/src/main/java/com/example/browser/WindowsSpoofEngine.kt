@@ -13,19 +13,24 @@ object WindowsSpoofEngine {
   }
 
   fun getCustomHeaders(settings: BrowserSettings): Map<String, String> {
-    if (!settings.isDesktopSpoofing) return emptyMap()
-
-    val preset = settings.windowsPreset
-    return mapOf(
-      "Sec-CH-UA" to "\"${preset.chBrand}\";v=\"${preset.chVersion}\", \"Chromium\";v=\"${preset.chVersion}\", \"Not_A Brand\";v=\"24\"",
-      "Sec-CH-UA-Mobile" to "?0",
-      "Sec-CH-UA-Platform" to "\"Windows\"",
-      "Sec-CH-UA-Platform-Version" to "\"15.0.0\"",
-      "Sec-CH-UA-Arch" to "\"x86\"",
-      "Sec-CH-UA-Bitness" to "\"64\"",
-      "Sec-CH-UA-Model" to "\"\"",
-      "Upgrade-Insecure-Requests" to "1"
+    val headers = mutableMapOf<String, String>(
+      "YouTube-Restrict" to "Strict",
+      "X-Forwarded-SafeSearch" to "1"
     )
+
+    if (settings.isDesktopSpoofing) {
+      val preset = settings.windowsPreset
+      headers["Sec-CH-UA"] = "\"${preset.chBrand}\";v=\"${preset.chVersion}\", \"Chromium\";v=\"${preset.chVersion}\", \"Not_A Brand\";v=\"24\""
+      headers["Sec-CH-UA-Mobile"] = "?0"
+      headers["Sec-CH-UA-Platform"] = "\"Windows\""
+      headers["Sec-CH-UA-Platform-Version"] = "\"15.0.0\""
+      headers["Sec-CH-UA-Arch"] = "\"x86\""
+      headers["Sec-CH-UA-Bitness"] = "\"64\""
+      headers["Sec-CH-UA-Model"] = "\"\""
+      headers["Upgrade-Insecure-Requests"] = "1"
+    }
+
+    return headers
   }
 
   fun getSpoofingJavaScript(settings: BrowserSettings): String {

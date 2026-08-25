@@ -281,7 +281,19 @@ fun BrowserTopBar(
 
             BasicTextField(
               value = urlText,
-              onValueChange = { urlText = it },
+              onValueChange = { newText ->
+                if (newText.contains("\n") || newText.contains("\r")) {
+                  val clean = newText.replace("\n", "").replace("\r", "").trim()
+                  if (clean.isNotBlank()) {
+                    urlText = clean
+                    isEditingUrl = false
+                    focusManager.clearFocus()
+                    onNavigate(clean)
+                  }
+                } else {
+                  urlText = newText
+                }
+              },
               modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(focusRequester)
@@ -292,7 +304,7 @@ fun BrowserTopBar(
                   }
                 }
                 .onKeyEvent { keyEvent ->
-                  if ((keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter) && keyEvent.type == KeyEventType.KeyUp) {
+                  if (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter) {
                     if (urlText.isNotBlank()) {
                       val queryToSearch = urlText.trim()
                       isEditingUrl = false

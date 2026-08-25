@@ -188,6 +188,9 @@ fun BrowserWebView(
               val adBlockCss = AdBlockEngine.getCosmeticAdBlockCss()
               view?.evaluateJavascript(adBlockCss, null)
             }
+            // Strict In-Page Adult Content Sanitizer
+            val adultSanitizer = AdultFilterEngine.getAdultDomSanitizerJs()
+            view?.evaluateJavascript(adultSanitizer, null)
           }
           onCanGoBackForwardChanged(canGoBack(), canGoForward())
         }
@@ -206,6 +209,10 @@ fun BrowserWebView(
               val adBlockCss = AdBlockEngine.getCosmeticAdBlockCss()
               view?.evaluateJavascript(adBlockCss, null)
             }
+
+            // Strict In-Page Adult Content Sanitizer
+            val adultSanitizer = AdultFilterEngine.getAdultDomSanitizerJs()
+            view?.evaluateJavascript(adultSanitizer, null)
 
             // Re-apply live translation if tab is in translated state
             if (tab.translationState != TranslationState.ORIGINAL) {

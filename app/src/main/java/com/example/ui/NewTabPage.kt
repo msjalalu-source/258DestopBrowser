@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -53,9 +54,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -148,6 +154,9 @@ fun NewTabPage(
     )
   }
 
+  val focusManager = LocalFocusManager.current
+  var homeSearchQuery by remember { mutableStateOf("") }
+
   Column(
     modifier = modifier
       .fillMaxSize()
@@ -156,7 +165,206 @@ fun NewTabPage(
       .padding(16.dp),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
-    Spacer(modifier = Modifier.height(4.dp))
+    Spacer(modifier = Modifier.height(8.dp))
+
+    // Browser / Engine Logo & Hero Title
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.Center,
+      modifier = Modifier.padding(vertical = 12.dp)
+    ) {
+      Box(
+        modifier = Modifier
+          .size(42.dp)
+          .clip(CircleShape)
+          .background(
+            Brush.linearGradient(
+              colors = listOf(WinBlue, WinCyan)
+            )
+          ),
+        contentAlignment = Alignment.Center
+      ) {
+        Icon(
+          imageVector = Icons.Default.DesktopWindows,
+          contentDescription = null,
+          tint = Color.White,
+          modifier = Modifier.size(24.dp)
+        )
+      }
+      Spacer(modifier = Modifier.width(12.dp))
+      Column {
+        Text(
+          text = "WinBrowse Pro",
+          style = MaterialTheme.typography.titleLarge,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onBackground
+        )
+        Text(
+          text = "Windows 11 Engine & Safe Filter",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
+    }
+
+    Spacer(modifier = Modifier.height(10.dp))
+
+    // Central Home Page Search Bar
+    Surface(
+      modifier = Modifier
+        .fillMaxWidth()
+        .height(54.dp),
+      shape = RoundedCornerShape(27.dp),
+      color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+      shadowElevation = 2.dp
+    ) {
+      Row(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        // Engine selector badge
+        SearchEngineDropdownSelector(
+          selectedEngine = settings.searchEngine,
+          onEngineSelected = onSelectSearchEngine
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Center Input field
+        Box(
+          modifier = Modifier.weight(1f),
+          contentAlignment = Alignment.CenterStart
+        ) {
+          if (homeSearchQuery.isEmpty()) {
+            Text(
+              text = "Search with ${settings.searchEngine.displayName} or enter URL...",
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis
+            )
+          }
+
+          androidx.compose.foundation.text.BasicTextField(
+            value = homeSearchQuery,
+            onValueChange = { newText ->
+              if (newText.contains("\n") || newText.contains("\r")) {
+                val clean = newText.replace("\n", "").replace("\r", "").trim()
+                if (clean.isNotBlank()) {
+                  homeSearchQuery = ""
+                  focusManager.clearFocus()
+                  onNavigate(clean)
+                }
+              } else {
+                homeSearchQuery = newText
+              }
+            },
+            modifier = Modifier
+              .fillMaxWidth()
+              .onKeyEvent { keyEvent ->
+                if (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter) {
+                  if (homeSearchQuery.isNotBlank()) {
+                    val query = homeSearchQuery.trim()
+                    homeSearchQuery = ""
+                    focusManager.clearFocus()
+                    onNavigate(query)
+                    true
+                  } else {
+                    false
+                  }
+                } else {
+                  false
+                }
+              }
+              .testTag("home_page_search_input"),
+            textStyle = androidx.compose.ui.text.TextStyle(
+              color = MaterialTheme.colorScheme.onSurface,
+              fontSize = 15.sp
+            ),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+              imeAction = ImeAction.Search,
+              keyboardType = KeyboardType.Text
+            ),
+            keyboardActions = KeyboardActions(
+              onSearch = {
+                if (homeSearchQuery.isNotBlank()) {
+                  val query = homeSearchQuery.trim()
+                  homeSearchQuery = ""
+                  focusManager.clearFocus()
+                  onNavigate(query)
+                }
+              },
+              onGo = {
+                if (homeSearchQuery.isNotBlank()) {
+                  val query = homeSearchQuery.trim()
+                  homeSearchQuery = ""
+                  focusManager.clearFocus()
+                  onNavigate(query)
+                }
+              },
+              onDone = {
+                if (homeSearchQuery.isNotBlank()) {
+                  val query = homeSearchQuery.trim()
+                  homeSearchQuery = ""
+                  focusManager.clearFocus()
+                  onNavigate(query)
+                }
+              },
+              onSend = {
+                if (homeSearchQuery.isNotBlank()) {
+                  val query = homeSearchQuery.trim()
+                  homeSearchQuery = ""
+                  focusManager.clearFocus()
+                  onNavigate(query)
+                }
+              }
+            )
+          )
+        }
+
+        // Action Buttons: Clear & Submit Search
+        if (homeSearchQuery.isNotEmpty()) {
+          IconButton(
+            onClick = { homeSearchQuery = "" },
+            modifier = Modifier.size(30.dp)
+          ) {
+            Icon(
+              imageVector = Icons.Default.Close,
+              contentDescription = "Clear",
+              tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.size(18.dp)
+            )
+          }
+        }
+
+        IconButton(
+          onClick = {
+            if (homeSearchQuery.isNotBlank()) {
+              val query = homeSearchQuery.trim()
+              homeSearchQuery = ""
+              focusManager.clearFocus()
+              onNavigate(query)
+            }
+          },
+          modifier = Modifier
+            .size(36.dp)
+            .testTag("home_page_search_button")
+        ) {
+          Icon(
+            imageVector = Icons.Default.Search,
+            contentDescription = "Search",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp)
+          )
+        }
+      }
+    }
+
+    Spacer(modifier = Modifier.height(20.dp))
 
     // Quick Shortcuts Grid
     Row(
