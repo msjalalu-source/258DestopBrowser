@@ -62,11 +62,17 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -257,7 +263,12 @@ fun BrowserTopBar(
           Spacer(modifier = Modifier.width(6.dp))
 
           // Center: Text Input Area
-          Box(modifier = Modifier.weight(1f)) {
+          Box(
+            modifier = Modifier
+              .weight(1f)
+              .clickable { focusRequester.requestFocus() },
+            contentAlignment = Alignment.CenterStart
+          ) {
             if (urlText.isEmpty() && !isEditingUrl) {
               Text(
                 text = "Search with ${searchEngine.displayName} or enter URL",
@@ -280,6 +291,21 @@ fun BrowserTopBar(
                     urlText = tab.url
                   }
                 }
+                .onKeyEvent { keyEvent ->
+                  if ((keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter) && keyEvent.type == KeyEventType.KeyUp) {
+                    if (urlText.isNotBlank()) {
+                      val queryToSearch = urlText.trim()
+                      isEditingUrl = false
+                      focusManager.clearFocus()
+                      onNavigate(queryToSearch)
+                      true
+                    } else {
+                      false
+                    }
+                  } else {
+                    false
+                  }
+                }
                 .testTag("url_address_input"),
               textStyle = TextStyle(
                 color = MaterialTheme.colorScheme.onSurface,
@@ -287,12 +313,41 @@ fun BrowserTopBar(
               ),
               cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
               singleLine = true,
-              keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+              keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Search,
+                keyboardType = KeyboardType.Text
+              ),
               keyboardActions = KeyboardActions(
+                onSearch = {
+                  if (urlText.isNotBlank()) {
+                    val queryToSearch = urlText.trim()
+                    isEditingUrl = false
+                    focusManager.clearFocus()
+                    onNavigate(queryToSearch)
+                  }
+                },
                 onGo = {
                   if (urlText.isNotBlank()) {
-                    onNavigate(urlText)
+                    val queryToSearch = urlText.trim()
+                    isEditingUrl = false
                     focusManager.clearFocus()
+                    onNavigate(queryToSearch)
+                  }
+                },
+                onDone = {
+                  if (urlText.isNotBlank()) {
+                    val queryToSearch = urlText.trim()
+                    isEditingUrl = false
+                    focusManager.clearFocus()
+                    onNavigate(queryToSearch)
+                  }
+                },
+                onSend = {
+                  if (urlText.isNotBlank()) {
+                    val queryToSearch = urlText.trim()
+                    isEditingUrl = false
+                    focusManager.clearFocus()
+                    onNavigate(queryToSearch)
                   }
                 }
               )
@@ -300,33 +355,39 @@ fun BrowserTopBar(
           }
 
           // Right action buttons (Clear / Search submit / Reload)
-          if (isEditingUrl && urlText.isNotEmpty()) {
-            IconButton(
-              onClick = { urlText = "" },
-              modifier = Modifier.size(26.dp)
-            ) {
-              Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Clear",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
-              )
+          if (urlText.isNotBlank() && (isEditingUrl || tab.url == "about:home")) {
+            if (urlText.isNotEmpty()) {
+              IconButton(
+                onClick = { urlText = "" },
+                modifier = Modifier.size(26.dp)
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Close,
+                  contentDescription = "Clear",
+                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                  modifier = Modifier.size(16.dp)
+                )
+              }
             }
 
             IconButton(
               onClick = {
                 if (urlText.isNotBlank()) {
-                  onNavigate(urlText)
+                  val queryToSearch = urlText.trim()
+                  isEditingUrl = false
                   focusManager.clearFocus()
+                  onNavigate(queryToSearch)
                 }
               },
-              modifier = Modifier.size(28.dp)
+              modifier = Modifier
+                .size(28.dp)
+                .testTag("address_bar_search_action_button")
             ) {
               Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(20.dp)
               )
             }
           } else if (tab.url != "about:home") {

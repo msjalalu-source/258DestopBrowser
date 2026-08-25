@@ -52,12 +52,176 @@ fun BrowserWebView(
 ) {
   val context = LocalContext.current
 
-  val webView = remember {
+  val webView = remember(tab.id) {
     WebView(context).apply {
       layoutParams = ViewGroup.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.MATCH_PARENT
       )
+
+      val tabSettings = settings.copy(isDesktopSpoofing = tab.isDesktopMode)
+      val targetUserAgent = WindowsSpoofEngine.getUserAgent(tabSettings)
+
+      this.settings.apply {
+        userAgentString = targetUserAgent
+        javaScriptEnabled = settings.isJavaScriptEnabled
+        domStorageEnabled = true
+        databaseEnabled = true
+        setSupportZoom(true)
+        builtInZoomControls = true
+        displayZoomControls = false
+
+        if (tab.isDesktopMode) {
+          useWideViewPort = true
+          loadWithOverviewMode = true
+          layoutAlgorithm = WebSettings.LayoutAlgorithm.NORMAL
+        } else {
+          useWideViewPort = false
+          loadWithOverviewMode = false
+          layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
+        }
+
+        setSupportMultipleWindows(true)
+        javaScriptCanOpenWindowsAutomatically = !settings.isPopupBlockerEnabled
+        mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+      }
+
+      val cookieManager = CookieManager.getInstance()
+      cookieManager.setAcceptCookie(settings.isCookiesEnabled)
+      cookieManager.setAcceptThirdPartyCookies(this, settings.isCookiesEnabled)
+
+      webChromeClient = object : WebChromeClient() {
+        override fun onProgressChanged(view: WebView?, newProgress: Int) {
+          onProgressChanged(newProgress)
+          if (tab.isDesktopMode && (newProgress == 10 || newProgress == 25 || newProgress == 50)) {
+            val spoofJs = WindowsSpoofEngine.getSpoofingJavaScript(tabSettings)
+            view?.evaluateJavascript(spoofJs, null)
+          }
+          onCanGoBackForwardChanged(canGoBack(), canGoForward())
+        }
+
+        override fun onReceivedTitle(view: WebView?, title: String?) {
+          if (!title.isNullOrBlank() && view?.url != null && !view.url!!.startsWith("about:home")) {
+            onPageFinished(view.url!!, title)
+          }
+        }
+
+        override fun onCreateWindow(
+          view: WebView?,
+          isDialog: Boolean,
+          isUserGesture: Boolean,
+          resultMsg: Message?
+        ): Boolean {
+          val currentHost = try { Uri.parse(view?.url ?: "").host ?: "Unknown site" } catch (e: Exception) { "Unknown site" }
+          if (settings.isPopupBlockerEnabled && !isUserGesture) {
+            onBlockedPopup(currentHost)
+            return false
+          }
+          return false
+        }
+      }
+
+      webViewClient = object : WebViewClient() {
+        override fun shouldOverrideUrlLoading(
+          view: WebView?,
+          request: WebResourceRequest?
+        ): Boolean {
+          val targetUrl = request?.url?.toString() ?: ""
+          if (AdultFilterEngine.isAdultContent(targetUrl)) {
+            onBlockedAdult(targetUrl)
+            val blockedHtml = AdultFilterEngine.getBlockedAdultHtml(targetUrl)
+            val dataUrl = "data:text/html;charset=utf-8," + Uri.encode(blockedHtml)
+            view?.loadUrl(dataUrl)
+            return true
+          }
+          return false
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+          val targetUrl = url ?: ""
+          if (AdultFilterEngine.isAdultContent(targetUrl)) {
+            onBlockedAdult(targetUrl)
+            val blockedHtml = AdultFilterEngine.getBlockedAdultHtml(targetUrl)
+            val dataUrl = "data:text/html;charset=utf-8," + Uri.encode(blockedHtml)
+            view?.loadUrl(dataUrl)
+            return true
+          }
+          return false
+        }
+
+        override fun shouldInterceptRequest(
+          view: WebView?,
+          request: WebResourceRequest?
+        ): WebResourceResponse? {
+          val url = request?.url?.toString() ?: ""
+
+          // Strict Adult Content Filter
+          if (AdultFilterEngine.isAdultContent(url)) {
+            onBlockedAdult(url)
+            return if (request?.isForMainFrame == true) {
+              AdultFilterEngine.createBlockedAdultResponse(url)
+            } else {
+              AdBlockEngine.createEmptyBlockedResponse()
+            }
+          }
+
+          // Ad & Tracker blocker
+          if (settings.isAdBlockerEnabled && AdBlockEngine.shouldBlockUrl(url)) {
+            onBlockedAd()
+            return AdBlockEngine.createEmptyBlockedResponse()
+          }
+
+          return super.shouldInterceptRequest(view, request)
+        }
+
+        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+          super.onPageStarted(view, url, favicon)
+          if (url != null) {
+            onPageStarted(url)
+            // Early injection of spoofing JS & CSS
+            if (tab.isDesktopMode) {
+              val spoofJs = WindowsSpoofEngine.getSpoofingJavaScript(tabSettings)
+              view?.evaluateJavascript(spoofJs, null)
+            }
+            if (settings.isAdBlockerEnabled && settings.isCosmeticAdBlockingEnabled) {
+              val adBlockCss = AdBlockEngine.getCosmeticAdBlockCss()
+              view?.evaluateJavascript(adBlockCss, null)
+            }
+          }
+          onCanGoBackForwardChanged(canGoBack(), canGoForward())
+        }
+
+        override fun onPageFinished(view: WebView?, url: String?) {
+          super.onPageFinished(view, url)
+          if (url != null && !url.startsWith("about:home")) {
+            onPageFinished(url, view?.title)
+
+            // Re-inject for dynamic single-page applications
+            if (tab.isDesktopMode) {
+              val spoofJs = WindowsSpoofEngine.getSpoofingJavaScript(tabSettings)
+              view?.evaluateJavascript(spoofJs, null)
+            }
+            if (settings.isAdBlockerEnabled && settings.isCosmeticAdBlockingEnabled) {
+              val adBlockCss = AdBlockEngine.getCosmeticAdBlockCss()
+              view?.evaluateJavascript(adBlockCss, null)
+            }
+
+            // Re-apply live translation if tab is in translated state
+            if (tab.translationState != TranslationState.ORIGINAL) {
+              val translateScript = LiveTranslationEngine.getTranslationScript(tab.translationState)
+              view?.evaluateJavascript(translateScript, null)
+            }
+
+            // Run silent background audit to record live spoofing state
+            view?.evaluateJavascript(WindowsSpoofEngine.getLiveAuditScript()) { rawResult ->
+              val report = WindowsSpoofEngine.parseAuditResult(rawResult)
+              onAuditResult(report)
+            }
+          }
+          onCanGoBackForwardChanged(canGoBack(), canGoForward())
+        }
+      }
     }
   }
 
@@ -138,133 +302,18 @@ fun BrowserWebView(
 
   AndroidView(
     factory = {
-      webView.apply {
-        val tabSettings = settings.copy(isDesktopSpoofing = tab.isDesktopMode)
-
-        webChromeClient = object : WebChromeClient() {
-          override fun onProgressChanged(view: WebView?, newProgress: Int) {
-            onProgressChanged(newProgress)
-            if (tab.isDesktopMode && (newProgress == 10 || newProgress == 25 || newProgress == 50)) {
-              val spoofJs = WindowsSpoofEngine.getSpoofingJavaScript(tabSettings)
-              view?.evaluateJavascript(spoofJs, null)
-            }
-            onCanGoBackForwardChanged(canGoBack(), canGoForward())
-          }
-
-          override fun onReceivedTitle(view: WebView?, title: String?) {
-            if (!title.isNullOrBlank() && view?.url != null && !view.url!!.startsWith("about:home")) {
-              onPageFinished(view.url!!, title)
-            }
-          }
-
-          override fun onCreateWindow(
-            view: WebView?,
-            isDialog: Boolean,
-            isUserGesture: Boolean,
-            resultMsg: Message?
-          ): Boolean {
-            val currentHost = try { Uri.parse(view?.url ?: "").host ?: "Unknown site" } catch (e: Exception) { "Unknown site" }
-            if (settings.isPopupBlockerEnabled && !isUserGesture) {
-              onBlockedPopup(currentHost)
-              return false
-            }
-            // If popups allowed or user gesture triggered
-            return false
-          }
-        }
-
-        webViewClient = object : WebViewClient() {
-          override fun shouldOverrideUrlLoading(
-            view: WebView?,
-            request: WebResourceRequest?
-          ): Boolean {
-            val targetUrl = request?.url?.toString() ?: ""
-            if (AdultFilterEngine.isAdultContent(targetUrl)) {
-              onBlockedAdult(targetUrl)
-              val blockedHtml = AdultFilterEngine.getBlockedAdultHtml(targetUrl)
-              val dataUrl = "data:text/html;charset=utf-8," + Uri.encode(blockedHtml)
-              view?.loadUrl(dataUrl)
-              return true
-            }
-            return false
-          }
-
-          override fun shouldInterceptRequest(
-            view: WebView?,
-            request: WebResourceRequest?
-          ): WebResourceResponse? {
-            val url = request?.url?.toString() ?: ""
-
-            // Strict Adult Content Filter
-            if (AdultFilterEngine.isAdultContent(url)) {
-              onBlockedAdult(url)
-              return if (request?.isForMainFrame == true) {
-                AdultFilterEngine.createBlockedAdultResponse(url)
-              } else {
-                AdBlockEngine.createEmptyBlockedResponse()
-              }
-            }
-
-            // Ad & Tracker blocker
-            if (settings.isAdBlockerEnabled && AdBlockEngine.shouldBlockUrl(url)) {
-              onBlockedAd()
-              return AdBlockEngine.createEmptyBlockedResponse()
-            }
-
-            return super.shouldInterceptRequest(view, request)
-          }
-
-          override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-            super.onPageStarted(view, url, favicon)
-            if (url != null) {
-              onPageStarted(url)
-              // Early injection of spoofing JS & CSS
-              if (tab.isDesktopMode) {
-                val spoofJs = WindowsSpoofEngine.getSpoofingJavaScript(tabSettings)
-                view?.evaluateJavascript(spoofJs, null)
-              }
-              if (settings.isAdBlockerEnabled && settings.isCosmeticAdBlockingEnabled) {
-                val adBlockCss = AdBlockEngine.getCosmeticAdBlockCss()
-                view?.evaluateJavascript(adBlockCss, null)
-              }
-            }
-            onCanGoBackForwardChanged(canGoBack(), canGoForward())
-          }
-
-          override fun onPageFinished(view: WebView?, url: String?) {
-            super.onPageFinished(view, url)
-            if (url != null && !url.startsWith("about:home")) {
-              onPageFinished(url, view?.title)
-
-              // Re-inject for dynamic single-page applications
-              if (tab.isDesktopMode) {
-                val spoofJs = WindowsSpoofEngine.getSpoofingJavaScript(tabSettings)
-                view?.evaluateJavascript(spoofJs, null)
-              }
-              if (settings.isAdBlockerEnabled && settings.isCosmeticAdBlockingEnabled) {
-                val adBlockCss = AdBlockEngine.getCosmeticAdBlockCss()
-                view?.evaluateJavascript(adBlockCss, null)
-              }
-
-              // Re-apply live translation if tab is in translated state
-              if (tab.translationState != TranslationState.ORIGINAL) {
-                val translateScript = LiveTranslationEngine.getTranslationScript(tab.translationState)
-                view?.evaluateJavascript(translateScript, null)
-              }
-
-              // Run silent background audit to record live spoofing state
-              view?.evaluateJavascript(WindowsSpoofEngine.getLiveAuditScript()) { rawResult ->
-                val report = WindowsSpoofEngine.parseAuditResult(rawResult)
-                onAuditResult(report)
-              }
-            }
-            onCanGoBackForwardChanged(canGoBack(), canGoForward())
-          }
-        }
-      }
+      webView
     },
     update = { wv ->
-      // Ensure webview reference is kept updated
+      if (tab.url.isNotBlank() && tab.url != "about:home" && wv.url != tab.url) {
+        val tabSettings = settings.copy(isDesktopSpoofing = tab.isDesktopMode)
+        val headers = WindowsSpoofEngine.getCustomHeaders(tabSettings)
+        if (headers.isNotEmpty() && !tab.url.startsWith("data:") && !tab.url.startsWith("about:")) {
+          wv.loadUrl(tab.url, headers)
+        } else {
+          wv.loadUrl(tab.url)
+        }
+      }
     },
     modifier = modifier
       .fillMaxSize()
