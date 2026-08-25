@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.browser.ActiveSheet
 import com.example.browser.BrowserSettings
+import com.example.browser.SearchEngine
 import com.example.browser.TabModel
 import com.example.ui.theme.AdBlockGreen
 import com.example.ui.theme.WinBlue
@@ -80,6 +81,7 @@ fun NewTabPage(
   tab: TabModel,
   settings: BrowserSettings,
   onNavigate: (String) -> Unit,
+  onSelectSearchEngine: (SearchEngine) -> Unit = {},
   onToggleDesktop: () -> Unit,
   onOpenSheet: (ActiveSheet) -> Unit,
   onOpenDiagnostics: () -> Unit,
@@ -276,7 +278,7 @@ fun NewTabPage(
 
     Spacer(modifier = Modifier.height(20.dp))
 
-    // Search Input Field
+    // Search Input Field with integrated search engine logo dropdown
     OutlinedTextField(
       value = searchQuery,
       onValueChange = { searchQuery = it },
@@ -284,14 +286,18 @@ fun NewTabPage(
         .fillMaxWidth()
         .testTag("home_search_input"),
       placeholder = {
-        Text("Search ${settings.searchEngine.displayName} or enter web address...")
+        Text("Search with ${settings.searchEngine.displayName} or enter URL...")
       },
       leadingIcon = {
-        Icon(
-          imageVector = Icons.Default.Search,
-          contentDescription = "Search",
-          tint = MaterialTheme.colorScheme.primary
-        )
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.padding(start = 8.dp, end = 4.dp)
+        ) {
+          SearchEngineDropdownSelector(
+            selectedEngine = settings.searchEngine,
+            onEngineSelected = onSelectSearchEngine
+          )
+        }
       },
       trailingIcon = {
         if (searchQuery.isNotBlank()) {
@@ -303,8 +309,8 @@ fun NewTabPage(
             modifier = Modifier.testTag("home_search_submit_btn")
           ) {
             Icon(
-              imageVector = Icons.Default.Language,
-              contentDescription = "Go",
+              imageVector = Icons.Default.Search,
+              contentDescription = "Search",
               tint = MaterialTheme.colorScheme.primary
             )
           }
@@ -406,92 +412,6 @@ fun NewTabPage(
     Spacer(modifier = Modifier.height(16.dp))
 
     // Protection & Spoofing Feature Cards
-    // Adult Content Filter Status Card (Top Priority)
-    Card(
-      modifier = Modifier
-        .fillMaxWidth()
-        .clip(RoundedCornerShape(14.dp))
-        .clickable { onOpenSheet(ActiveSheet.BLOCKED_DETAILS) }
-        .testTag("adult_filter_status_card"),
-      colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceVariant
-      )
-    ) {
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-      ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier.weight(1f)
-        ) {
-          Box(
-            modifier = Modifier
-              .size(40.dp)
-              .clip(CircleShape)
-              .background(Color(0xFFDC2626).copy(alpha = 0.15f)),
-            contentAlignment = Alignment.Center
-          ) {
-            Icon(
-              imageVector = Icons.Default.Security,
-              contentDescription = null,
-              tint = Color(0xFFDC2626),
-              modifier = Modifier.size(22.dp)
-            )
-          }
-          Spacer(modifier = Modifier.width(12.dp))
-          Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-              Text(
-                text = "Adult & NSFW Content Shield",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-              )
-              Spacer(modifier = Modifier.width(6.dp))
-              Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = Color(0xFFDC2626).copy(alpha = 0.18f)
-              ) {
-                Text(
-                  text = "🔒 LOCKED ON",
-                  style = MaterialTheme.typography.labelSmall,
-                  fontSize = 9.sp,
-                  fontWeight = FontWeight.ExtraBold,
-                  color = Color(0xFFDC2626),
-                  modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-              }
-            }
-            Text(
-              text = "এডাল্ট ফিল্টার স্থায়ীভাবে সক্রিয় • অফ করা যাবে না",
-              style = MaterialTheme.typography.bodySmall,
-              fontWeight = FontWeight.Medium,
-              color = Color(0xFFDC2626)
-            )
-          }
-        }
-
-        Surface(
-          shape = RoundedCornerShape(10.dp),
-          color = Color(0xFFDC2626).copy(alpha = 0.12f)
-        ) {
-          Text(
-            text = "${tab.blockedAdultCount} BLOCKED",
-            color = Color(0xFFDC2626),
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-          )
-        }
-      }
-    }
-
-    Spacer(modifier = Modifier.height(12.dp))
-
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.spacedBy(12.dp)

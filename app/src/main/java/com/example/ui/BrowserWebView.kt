@@ -27,7 +27,9 @@ import com.example.browser.AdBlockEngine
 import com.example.browser.AdultFilterEngine
 import com.example.browser.BrowserSettings
 import com.example.browser.LiveAuditReport
+import com.example.browser.LiveTranslationEngine
 import com.example.browser.TabModel
+import com.example.browser.TranslationState
 import com.example.browser.WindowsSpoofEngine
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -119,6 +121,14 @@ fun BrowserWebView(
     }
   }
 
+  // Handle translation state changes
+  LaunchedEffect(tab.translationState) {
+    if (tab.url.isNotBlank() && tab.url != "about:home" && !tab.url.startsWith("data:")) {
+      val translateScript = LiveTranslationEngine.getTranslationScript(tab.translationState)
+      webView.evaluateJavascript(translateScript, null)
+    }
+  }
+
   DisposableEffect(tab.id) {
     onWebViewCreated(webView)
     onDispose {
@@ -134,6 +144,10 @@ fun BrowserWebView(
         webChromeClient = object : WebChromeClient() {
           override fun onProgressChanged(view: WebView?, newProgress: Int) {
             onProgressChanged(newProgress)
+            if (tab.isDesktopMode && (newProgress == 10 || newProgress == 25 || newProgress == 50)) {
+              val spoofJs = WindowsSpoofEngine.getSpoofingJavaScript(tabSettings)
+              view?.evaluateJavascript(spoofJs, null)
+            }
             onCanGoBackForwardChanged(canGoBack(), canGoForward())
           }
 
@@ -230,6 +244,12 @@ fun BrowserWebView(
               if (settings.isAdBlockerEnabled && settings.isCosmeticAdBlockingEnabled) {
                 val adBlockCss = AdBlockEngine.getCosmeticAdBlockCss()
                 view?.evaluateJavascript(adBlockCss, null)
+              }
+
+              // Re-apply live translation if tab is in translated state
+              if (tab.translationState != TranslationState.ORIGINAL) {
+                val translateScript = LiveTranslationEngine.getTranslationScript(tab.translationState)
+                view?.evaluateJavascript(translateScript, null)
               }
 
               // Run silent background audit to record live spoofing state

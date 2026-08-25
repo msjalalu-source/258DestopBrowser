@@ -15,5 +15,6 @@ data class TabModel(
   val blockedAdsCount: Int = 0,
   val blockedPopupsCount: Int = 0,
   val blockedAdultCount: Int = 0,
-  val lastAuditReport: LiveAuditReport? = null
+  val lastAuditReport: LiveAuditReport? = null,
+  val translationState: TranslationState = TranslationState.ORIGINAL
 )

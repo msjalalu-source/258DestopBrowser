@@ -138,7 +138,8 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     blockedAdsCount: Int? = null,
     blockedPopupsCount: Int? = null,
     blockedAdultCount: Int? = null,
-    auditReport: LiveAuditReport? = null
+    auditReport: LiveAuditReport? = null,
+    translationState: TranslationState? = null
   ) {
     _tabs.update { list ->
       list.map { tab ->
@@ -155,7 +156,8 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
             blockedAdsCount = blockedAdsCount ?: tab.blockedAdsCount,
             blockedPopupsCount = blockedPopupsCount ?: tab.blockedPopupsCount,
             blockedAdultCount = blockedAdultCount ?: tab.blockedAdultCount,
-            lastAuditReport = auditReport ?: tab.lastAuditReport
+            lastAuditReport = auditReport ?: tab.lastAuditReport,
+            translationState = translationState ?: tab.translationState
           )
         } else {
           tab
@@ -164,6 +166,20 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
     if (tabId == _activeTabId.value && url != null) {
       checkActiveBookmark()
+    }
+  }
+
+  fun cycleTranslation(tabId: String) {
+    val tab = _tabs.value.find { it.id == tabId } ?: return
+    val nextState = tab.translationState.next()
+    updateTab(tabId, translationState = nextState)
+    viewModelScope.launch {
+      val message = when (nextState) {
+        TranslationState.BANGLA -> "অনুবাদ: বাংলা (Bangla)"
+        TranslationState.ENGLISH -> "Translation: English"
+        TranslationState.ORIGINAL -> "মূল ভাষা (Original Language)"
+      }
+      _snackbarMessage.emit(message)
     }
   }
 
@@ -289,6 +305,13 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
+  fun setSearchEngine(engine: SearchEngine) {
+    _settings.update { it.copy(searchEngine = engine) }
+    viewModelScope.launch {
+      _snackbarMessage.emit("Search engine set to ${engine.displayName}")
+    }
+  }
+
   fun updateSettings(newSettings: BrowserSettings) {
     val old = _settings.value
     _settings.value = newSettings
@@ -308,7 +331,7 @@ class BrowserViewModel(application: Application) : AndroidViewModel(application)
   }
 
   fun openDiagnosticsPage() {
-    val html = WindowsSpoofEngine.getDiagnosticTestHtml()
+    val html = WindowsSpoofEngine.getDiagnosticTestHtml(_settings.value)
     val dataUrl = "data:text/html;charset=utf-8," + Uri.encode(html)
     loadUrl(dataUrl)
     _activeSheet.value = ActiveSheet.NONE

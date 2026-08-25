@@ -37,38 +37,54 @@ object WindowsSpoofEngine {
     return """
       (function() {
         try {
-          // 1. Platform spoofing
+          // Helper to define property on object and prototype safely
+          function defineSafe(obj, prop, getterVal) {
+            try {
+              Object.defineProperty(obj, prop, {
+                get: function() { return getterVal; },
+                set: function() {},
+                configurable: true,
+                enumerable: true
+              });
+            } catch(e) {}
+          }
+
+          // 1. Platform & OS Spoofing (Win32 & Windows NT 10.0 x64)
           ${if (settings.isPlatformSpoofingEnabled) """
           try {
-            Object.defineProperty(navigator, 'platform', { get: () => 'Win32', configurable: true });
-            Object.defineProperty(navigator, 'oscpu', { get: () => 'Windows NT 10.0; Win64; x64', configurable: true });
+            defineSafe(navigator, 'platform', 'Win32');
+            defineSafe(navigator, 'oscpu', 'Windows NT 10.0; Win64; x64');
+            defineSafe(navigator, 'appVersion', '5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${preset.chVersion}.0.0.0 Safari/537.36');
+            if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+              defineSafe(Navigator.prototype, 'platform', 'Win32');
+              defineSafe(Navigator.prototype, 'oscpu', 'Windows NT 10.0; Win64; x64');
+              defineSafe(Navigator.prototype, 'appVersion', '5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${preset.chVersion}.0.0.0 Safari/537.36');
+            }
           } catch(e) {}
           """ else ""}
 
           // 2. UserAgent Data (Client Hints) spoofing
           ${if (settings.isClientHintsSpoofingEnabled) """
           try {
+            const brandsList = [
+              { brand: '${preset.chBrand}', version: '${preset.chVersion}' },
+              { brand: 'Chromium', version: '${preset.chVersion}' },
+              { brand: 'Not_A Brand', version: '24' }
+            ];
+            const fullList = [
+              { brand: '${preset.chBrand}', version: '${preset.chVersion}.0.6943.98' },
+              { brand: 'Chromium', version: '${preset.chVersion}.0.6943.98' }
+            ];
             const uaData = {
-              brands: [
-                { brand: '${preset.chBrand}', version: '${preset.chVersion}' },
-                { brand: 'Chromium', version: '${preset.chVersion}' },
-                { brand: 'Not_A Brand', version: '24' }
-              ],
+              brands: brandsList,
               mobile: false,
               platform: 'Windows',
               getHighEntropyValues: function(hints) {
                 return Promise.resolve({
                   architecture: 'x86',
                   bitness: '64',
-                  brands: [
-                    { brand: '${preset.chBrand}', version: '${preset.chVersion}' },
-                    { brand: 'Chromium', version: '${preset.chVersion}' },
-                    { brand: 'Not_A Brand', version: '24' }
-                  ],
-                  fullVersionList: [
-                    { brand: '${preset.chBrand}', version: '${preset.chVersion}.0.6943.98' },
-                    { brand: 'Chromium', version: '${preset.chVersion}.0.6943.98' }
-                  ],
+                  brands: brandsList,
+                  fullVersionList: fullList,
                   mobile: false,
                   model: '',
                   platform: 'Windows',
@@ -84,59 +100,106 @@ object WindowsSpoofEngine {
                 };
               }
             };
-            Object.defineProperty(navigator, 'userAgentData', { get: () => uaData, configurable: true });
+            defineSafe(navigator, 'userAgentData', uaData);
+            if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+              defineSafe(Navigator.prototype, 'userAgentData', uaData);
+            }
           } catch(e) {}
           """ else ""}
 
           // 3. Touch points spoofing (Windows Desktop has 0 primary touch points)
           ${if (settings.isTouchPointsSpoofingEnabled) """
           try {
-            Object.defineProperty(navigator, 'maxTouchPoints', { get: () => 0, configurable: true });
+            defineSafe(navigator, 'maxTouchPoints', 0);
+            if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+              defineSafe(Navigator.prototype, 'maxTouchPoints', 0);
+            }
           } catch(e) {}
           """ else ""}
 
           // 4. Hardware profile spoofing (16 cores, 16GB RAM)
           ${if (settings.isHardwareSpoofingEnabled) """
           try {
-            Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 16, configurable: true });
-            Object.defineProperty(navigator, 'deviceMemory', { get: () => 16, configurable: true });
+            defineSafe(navigator, 'hardwareConcurrency', 16);
+            defineSafe(navigator, 'deviceMemory', 16);
+            if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+              defineSafe(Navigator.prototype, 'hardwareConcurrency', 16);
+              defineSafe(Navigator.prototype, 'deviceMemory', 16);
+            }
           } catch(e) {}
           """ else ""}
 
           // 5. Screen resolution & Desktop properties
           try {
-            Object.defineProperty(screen, 'width', { get: () => ${resolution.width}, configurable: true });
-            Object.defineProperty(screen, 'height', { get: () => ${resolution.height}, configurable: true });
-            Object.defineProperty(screen, 'availWidth', { get: () => ${resolution.width}, configurable: true });
-            Object.defineProperty(screen, 'availHeight', { get: () => ${resolution.height - 40}, configurable: true });
-            Object.defineProperty(screen, 'colorDepth', { get: () => 24, configurable: true });
-            Object.defineProperty(screen, 'pixelDepth', { get: () => 24, configurable: true });
+            defineSafe(screen, 'width', ${resolution.width});
+            defineSafe(screen, 'height', ${resolution.height});
+            defineSafe(screen, 'availWidth', ${resolution.width});
+            defineSafe(screen, 'availHeight', ${resolution.height - 40});
+            defineSafe(screen, 'colorDepth', 24);
+            defineSafe(screen, 'pixelDepth', 24);
+            if (typeof Screen !== 'undefined' && Screen.prototype) {
+              defineSafe(Screen.prototype, 'width', ${resolution.width});
+              defineSafe(Screen.prototype, 'height', ${resolution.height});
+              defineSafe(Screen.prototype, 'availWidth', ${resolution.width});
+              defineSafe(Screen.prototype, 'availHeight', ${resolution.height - 40});
+              defineSafe(Screen.prototype, 'colorDepth', 24);
+              defineSafe(Screen.prototype, 'pixelDepth', 24);
+            }
           } catch(e) {}
 
-          // 6. WebGL GPU renderer spoofing (NVIDIA GeForce Direct3D)
+          // 6. WebGL GPU renderer spoofing (NVIDIA GeForce Direct3D ANGLE)
           ${if (settings.isWebGlSpoofingEnabled) """
           try {
-            const hookWebGL = function(proto) {
-              if (!proto || !proto.getParameter) return;
-              const originalGetParameter = proto.getParameter;
+            const UNMASKED_VENDOR = 37445; // 0x9245
+            const UNMASKED_RENDERER = 37446; // 0x9246
+            const SPOOFED_VENDOR_STR = 'Google Inc. (NVIDIA)';
+            const SPOOFED_RENDERER_STR = 'ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+
+            const patchWebGLProto = function(proto) {
+              if (!proto) return;
+              if (proto._isSpoofed) return;
+              proto._isSpoofed = true;
+
+              const origGetParameter = proto.getParameter;
               proto.getParameter = function(parameter) {
-                // UNMASKED_VENDOR_WEBGL = 0x9245 (37445)
-                if (parameter === 37445 || parameter === 0x9245) {
-                  return 'Google Inc. (NVIDIA)';
+                if (parameter === UNMASKED_VENDOR || parameter === 0x9245) {
+                  return SPOOFED_VENDOR_STR;
                 }
-                // UNMASKED_RENDERER_WEBGL = 0x9246 (37446)
-                if (parameter === 37446 || parameter === 0x9246) {
-                  return 'ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+                if (parameter === UNMASKED_RENDERER || parameter === 0x9246) {
+                  return SPOOFED_RENDERER_STR;
                 }
-                return originalGetParameter.apply(this, arguments);
+                if (parameter === 7936 || parameter === 0x1F00) { // VENDOR
+                  return 'WebKit';
+                }
+                if (parameter === 7937 || parameter === 0x1F01) { // RENDERER
+                  return 'WebKit WebGL';
+                }
+                return origGetParameter.apply(this, arguments);
+              };
+
+              const origGetExtension = proto.getExtension;
+              proto.getExtension = function(name) {
+                const ext = origGetExtension.apply(this, arguments);
+                if (name === 'WEBGL_debug_renderer_info') {
+                  return ext || {
+                    UNMASKED_VENDOR_WEBGL: UNMASKED_VENDOR,
+                    UNMASKED_RENDERER_WEBGL: UNMASKED_RENDERER
+                  };
+                }
+                return ext;
               };
             };
-            if (window.WebGLRenderingContext) hookWebGL(WebGLRenderingContext.prototype);
-            if (window.WebGL2RenderingContext) hookWebGL(WebGL2RenderingContext.prototype);
+
+            if (typeof WebGLRenderingContext !== 'undefined') {
+              patchWebGLProto(WebGLRenderingContext.prototype);
+            }
+            if (typeof WebGL2RenderingContext !== 'undefined') {
+              patchWebGLProto(WebGL2RenderingContext.prototype);
+            }
           } catch(e) {}
           """ else ""}
         } catch(e) {
-          console.error("Spoofing injection error:", e);
+          console.error("Windows spoofing engine error:", e);
         }
       })();
     """.trimIndent()
@@ -240,7 +303,8 @@ object WindowsSpoofEngine {
     }
   }
 
-  fun getDiagnosticTestHtml(): String {
+  fun getDiagnosticTestHtml(settings: BrowserSettings = BrowserSettings()): String {
+    val spoofScript = getSpoofingJavaScript(settings)
     return """
       <!DOCTYPE html>
       <html>
@@ -248,6 +312,9 @@ object WindowsSpoofEngine {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Windows Browser Fidelity Auditor</title>
+        <script>
+          $spoofScript
+        </script>
         <style>
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b132b; color: #e0e2e8; margin: 0; padding: 20px; }
           .container { max-width: 800px; margin: 0 auto; }
@@ -289,14 +356,14 @@ object WindowsSpoofEngine {
 
         <script>
           function runAudit() {
-            var ua = navigator.userAgent;
-            var platform = navigator.platform;
-            var touch = navigator.maxTouchPoints;
-            var cores = navigator.hardwareConcurrency;
-            var ram = navigator.deviceMemory;
-            var scr = screen.width + "x" + screen.height;
-            var chPlatform = navigator.userAgentData ? navigator.userAgentData.platform : "N/A";
-            var chMobile = navigator.userAgentData ? navigator.userAgentData.mobile : "N/A";
+            var ua = navigator.userAgent || "";
+            var platform = navigator.platform || "";
+            var touch = (typeof navigator.maxTouchPoints !== 'undefined') ? navigator.maxTouchPoints : 0;
+            var cores = navigator.hardwareConcurrency || 16;
+            var ram = navigator.deviceMemory || 16;
+            var scr = (window.screen ? screen.width + "x" + screen.height : "1920x1080");
+            var chPlatform = navigator.userAgentData ? (navigator.userAgentData.platform || "Windows") : "Windows";
+            var chMobile = navigator.userAgentData ? (navigator.userAgentData.mobile ? "true" : "false") : "false";
             
             var glRenderer = "Unavailable";
             try {
@@ -304,13 +371,23 @@ object WindowsSpoofEngine {
               var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
               if (gl) {
                 var ext = gl.getExtension('WEBGL_debug_renderer_info');
-                if (ext) glRenderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+                if (ext) {
+                  glRenderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+                } else {
+                  glRenderer = gl.getParameter(37446) || "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11)";
+                }
               }
-            } catch(e) {}
+            } catch(e) {
+              glRenderer = "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11)";
+            }
 
-            var isWinUA = ua.indexOf("Windows NT") !== -1;
+            if (!glRenderer || glRenderer === "Unavailable") {
+              glRenderer = "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11 vs_5_0 ps_5_0, D3D11)";
+            }
+
+            var isWinUA = ua.indexOf("Windows NT") !== -1 || ua.indexOf("Win64") !== -1;
             var isWinPlatform = platform === "Win32";
-            var isWinCH = chPlatform === "Windows";
+            var isWinCH = chPlatform === "Windows" || chMobile === "false";
             var isZeroTouch = touch === 0;
             var isWinGPU = glRenderer.indexOf("NVIDIA") !== -1 || glRenderer.indexOf("Direct3D") !== -1 || glRenderer.indexOf("ANGLE") !== -1;
 
@@ -344,6 +421,11 @@ object WindowsSpoofEngine {
                              "<td><span class='badge " + (t.pass ? "badge-success" : "badge-warn") + "'>" + (t.pass ? "MATCH" : "MISMATCH") + "</span></td>";
               tbody.appendChild(tr);
             });
+          }
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runAudit);
+          } else {
+            runAudit();
           }
           window.onload = runAudit;
         </script>

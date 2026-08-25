@@ -23,11 +23,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DesktopWindows
+import androidx.compose.material.icons.filled.GTranslate
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tab
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -54,10 +56,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.browser.ActiveSheet
 import com.example.browser.BrowserViewModel
 import com.example.browser.TabModel
+import com.example.browser.TranslationState
 import com.example.ui.theme.WinBlue
 import kotlinx.coroutines.launch
 
@@ -104,6 +108,8 @@ fun BrowserScreen(
         tab = activeTab,
         tabCount = tabs.size,
         isBookmarked = isBookmarked,
+        searchEngine = settings.searchEngine,
+        onSelectSearchEngine = { viewModel.setSearchEngine(it) },
         onNavigate = { input -> viewModel.loadUrl(input) },
         onReload = { webViewRef?.reload() },
         onToggleDesktop = { viewModel.toggleDesktopMode(activeTab.id) },
@@ -122,37 +128,11 @@ fun BrowserScreen(
         Row(
           modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .padding(horizontal = 8.dp),
+            .height(54.dp)
+            .padding(horizontal = 4.dp),
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.SpaceAround
+          horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-          // Back button
-          IconButton(
-            onClick = { webViewRef?.goBack() },
-            enabled = activeTab.canGoBack,
-            modifier = Modifier.testTag("nav_back_button")
-          ) {
-            Icon(
-              imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-              contentDescription = "Back",
-              tint = if (activeTab.canGoBack) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-            )
-          }
-
-          // Forward button
-          IconButton(
-            onClick = { webViewRef?.goForward() },
-            enabled = activeTab.canGoForward,
-            modifier = Modifier.testTag("nav_forward_button")
-          ) {
-            Icon(
-              imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-              contentDescription = "Forward",
-              tint = if (activeTab.canGoForward) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-            )
-          }
-
           // Home button
           IconButton(
             onClick = { viewModel.updateTab(activeTab.id, url = "about:home", title = "New Tab") },
@@ -177,28 +157,66 @@ fun BrowserScreen(
             )
           }
 
-          // Windows Fidelity Auditor quick launcher
+          // Switch 1: Plus (+) icon button to open a new tab
           IconButton(
-            onClick = { viewModel.setActiveSheet(ActiveSheet.WINDOWS_FIDELITY) },
-            modifier = Modifier.testTag("nav_fidelity_button")
+            onClick = { viewModel.createNewTab("about:home") },
+            modifier = Modifier.testTag("nav_new_tab_button")
           ) {
             Icon(
-              imageVector = Icons.Default.Speed,
-              contentDescription = "Windows Fidelity Score",
-              tint = if (activeTab.isDesktopMode) WinBlue else MaterialTheme.colorScheme.onSurfaceVariant
+              imageVector = Icons.Default.Add,
+              contentDescription = "New Tab",
+              tint = WinBlue,
+              modifier = Modifier.size(26.dp)
             )
           }
 
-          // New Tab / Tabs switcher
-          IconButton(
-            onClick = { viewModel.setActiveSheet(ActiveSheet.TABS) },
-            modifier = Modifier.testTag("nav_tabs_button")
+          // Switch 2: Live Translate 3-way toggle button (Bangla -> English -> Original)
+          Surface(
+            onClick = {
+              if (activeTab.url == "about:home") {
+                scope.launch {
+                  snackbarHostState.showSnackbar("Please open a webpage to use Live Translate")
+                }
+              } else {
+                viewModel.cycleTranslation(activeTab.id)
+              }
+            },
+            shape = CircleShape,
+            color = when (activeTab.translationState) {
+              TranslationState.BANGLA -> MaterialTheme.colorScheme.primaryContainer
+              TranslationState.ENGLISH -> MaterialTheme.colorScheme.secondaryContainer
+              TranslationState.ORIGINAL -> MaterialTheme.colorScheme.surface
+            },
+            modifier = Modifier
+              .testTag("nav_live_translate_button")
+              .padding(vertical = 4.dp)
           ) {
-            Icon(
-              imageVector = Icons.Default.Tab,
-              contentDescription = "Tabs",
-              tint = MaterialTheme.colorScheme.onSurface
-            )
+            Row(
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.Translate,
+                contentDescription = "Live Translate",
+                tint = when (activeTab.translationState) {
+                  TranslationState.BANGLA -> MaterialTheme.colorScheme.primary
+                  TranslationState.ENGLISH -> MaterialTheme.colorScheme.secondary
+                  TranslationState.ORIGINAL -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(20.dp)
+              )
+              Text(
+                text = activeTab.translationState.badge,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = when (activeTab.translationState) {
+                  TranslationState.BANGLA -> MaterialTheme.colorScheme.primary
+                  TranslationState.ENGLISH -> MaterialTheme.colorScheme.secondary
+                  TranslationState.ORIGINAL -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+              )
+            }
           }
         }
       }
@@ -214,6 +232,7 @@ fun BrowserScreen(
           tab = activeTab,
           settings = settings,
           onNavigate = { input -> viewModel.loadUrl(input) },
+          onSelectSearchEngine = { viewModel.setSearchEngine(it) },
           onToggleDesktop = { viewModel.toggleDesktopMode(activeTab.id) },
           onOpenSheet = { sheet -> viewModel.setActiveSheet(sheet) },
           onOpenDiagnostics = { viewModel.openDiagnosticsPage() }

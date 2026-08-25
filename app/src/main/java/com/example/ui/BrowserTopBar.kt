@@ -23,8 +23,10 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.History
@@ -66,18 +68,132 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.browser.ActiveSheet
+import com.example.browser.SearchEngine
 import com.example.browser.TabModel
 import com.example.ui.theme.AdBlockGreen
 import com.example.ui.theme.WinBlue
+
+@Composable
+fun SearchEngineIcon(
+  engine: SearchEngine,
+  size: Dp = 22.dp,
+  modifier: Modifier = Modifier
+) {
+  Box(
+    modifier = modifier
+      .size(size)
+      .clip(CircleShape)
+      .background(Color(engine.brandColorHex)),
+    contentAlignment = Alignment.Center
+  ) {
+    Text(
+      text = engine.shortLabel,
+      color = Color.White,
+      fontSize = if (engine.shortLabel.length > 2) (size.value * 0.42f).sp else (size.value * 0.58f).sp,
+      fontWeight = FontWeight.ExtraBold,
+      lineHeight = (size.value * 0.6f).sp
+    )
+  }
+}
+
+@Composable
+fun SearchEngineDropdownSelector(
+  selectedEngine: SearchEngine,
+  onEngineSelected: (SearchEngine) -> Unit,
+  modifier: Modifier = Modifier
+) {
+  var showDropdown by remember { mutableStateOf(false) }
+
+  Box(modifier = modifier) {
+    Surface(
+      modifier = Modifier
+        .clip(RoundedCornerShape(14.dp))
+        .clickable { showDropdown = true }
+        .testTag("addressbar_search_engine_trigger"),
+      color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+      shape = RoundedCornerShape(14.dp),
+      tonalElevation = 1.dp
+    ) {
+      Row(
+        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        SearchEngineIcon(engine = selectedEngine, size = 18.dp)
+        Spacer(modifier = Modifier.width(2.dp))
+        Icon(
+          imageVector = Icons.Default.ArrowDropDown,
+          contentDescription = "Change Search Engine",
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.size(16.dp)
+        )
+      }
+    }
+
+    DropdownMenu(
+      expanded = showDropdown,
+      onDismissRequest = { showDropdown = false },
+      modifier = Modifier
+        .background(MaterialTheme.colorScheme.surface)
+        .width(230.dp)
+    ) {
+      Text(
+        text = "Choose Search Engine",
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+      )
+      HorizontalDivider()
+
+      SearchEngine.entries.forEach { engine ->
+        DropdownMenuItem(
+          text = {
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              SearchEngineIcon(engine = engine, size = 22.dp)
+              Spacer(modifier = Modifier.width(10.dp))
+              Column(modifier = Modifier.weight(1f)) {
+                Text(
+                  text = engine.displayName,
+                  style = MaterialTheme.typography.bodyMedium,
+                  fontWeight = if (engine == selectedEngine) FontWeight.Bold else FontWeight.Normal,
+                  color = if (engine == selectedEngine) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+              }
+              if (engine == selectedEngine) {
+                Icon(
+                  imageVector = Icons.Default.Check,
+                  contentDescription = "Selected",
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(18.dp)
+                )
+              }
+            }
+          },
+          onClick = {
+            onEngineSelected(engine)
+            showDropdown = false
+          },
+          modifier = Modifier.testTag("search_engine_${engine.name.lowercase()}")
+        )
+      }
+    }
+  }
+}
 
 @Composable
 fun BrowserTopBar(
   tab: TabModel,
   tabCount: Int,
   isBookmarked: Boolean,
+  searchEngine: SearchEngine = SearchEngine.GOOGLE,
+  onSelectSearchEngine: (SearchEngine) -> Unit = {},
   onNavigate: (String) -> Unit,
   onReload: () -> Unit,
   onToggleDesktop: () -> Unit,
@@ -118,36 +234,7 @@ fun BrowserTopBar(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-      // Desktop / Mobile Mode Quick Switch Badge
-      Surface(
-        modifier = Modifier
-          .clip(RoundedCornerShape(12.dp))
-          .clickable { onToggleDesktop() }
-          .testTag("topbar_desktop_toggle"),
-        color = if (tab.isDesktopMode) WinBlue.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(12.dp)
-      ) {
-        Row(
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Icon(
-            imageVector = if (tab.isDesktopMode) Icons.Default.DesktopWindows else Icons.Default.PhoneAndroid,
-            contentDescription = if (tab.isDesktopMode) "Windows Desktop View" else "Mobile View",
-            tint = if (tab.isDesktopMode) WinBlue else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp)
-          )
-          Spacer(modifier = Modifier.width(4.dp))
-          Text(
-            text = if (tab.isDesktopMode) "Win" else "Mob",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = if (tab.isDesktopMode) WinBlue else MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-      }
-
-      // Address / Search Input Box
+      // Integrated Address / Search Input Box with Dropdown Search Engine
       Surface(
         modifier = Modifier
           .weight(1f)
@@ -158,24 +245,26 @@ fun BrowserTopBar(
         Row(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+            .padding(start = 6.dp, end = 8.dp),
           verticalAlignment = Alignment.CenterVertically
         ) {
-          Icon(
-            imageVector = if (tab.url.startsWith("https://")) Icons.Default.Lock else Icons.Default.Search,
-            contentDescription = null,
-            tint = if (tab.url.startsWith("https://")) AdBlockGreen else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(16.dp)
+          // Left: Search Engine Logo with Dropdown Selector
+          SearchEngineDropdownSelector(
+            selectedEngine = searchEngine,
+            onEngineSelected = onSelectSearchEngine
           )
 
-          Spacer(modifier = Modifier.width(8.dp))
+          Spacer(modifier = Modifier.width(6.dp))
 
+          // Center: Text Input Area
           Box(modifier = Modifier.weight(1f)) {
             if (urlText.isEmpty() && !isEditingUrl) {
               Text(
-                text = "Search or type URL",
+                text = "Search with ${searchEngine.displayName} or enter URL",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
               )
             }
 
@@ -210,16 +299,34 @@ fun BrowserTopBar(
             )
           }
 
+          // Right action buttons (Clear / Search submit / Reload)
           if (isEditingUrl && urlText.isNotEmpty()) {
             IconButton(
               onClick = { urlText = "" },
-              modifier = Modifier.size(24.dp)
+              modifier = Modifier.size(26.dp)
             ) {
               Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = "Clear",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(16.dp)
+              )
+            }
+
+            IconButton(
+              onClick = {
+                if (urlText.isNotBlank()) {
+                  onNavigate(urlText)
+                  focusManager.clearFocus()
+                }
+              },
+              modifier = Modifier.size(28.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
               )
             }
           } else if (tab.url != "about:home") {
